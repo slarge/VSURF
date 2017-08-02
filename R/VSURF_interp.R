@@ -156,16 +156,18 @@ VSURF_interp.default <- function(
     rf <- rep(NA, nfor.interp)
     u <- vars[1:i]
     w <- x[,u, drop=FALSE]
-
+    
+    dat <- cbind(w, "y" = y)
+    
     if (i <= n) {
       for (j in 1:nfor.interp) {
-        rf[j] <- tail(randomForest::randomForest(x=w, y=y, ...)$err.rate[,1], n=1)
+        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, ...)$prediction.error
       }
     }
     
     else {
       for (j in 1:nfor.interp) {
-        rf[j] <- tail(randomForest::randomForest(x=w, y=y, mtry=i/3, ...)$err.rate[,1], n=1)
+        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, mtry=i/3, ...)$prediction.error
       }
     }
     
@@ -177,8 +179,10 @@ VSURF_interp.default <- function(
     u <- vars[1:i]
     w <- x[,u, drop=FALSE]
     
+    dat <- cbind(w, "y" = y)
+    
     for (j in 1:nfor.interp) {
-      rf[j] <- tail(randomForest::randomForest(x=w, y=y, ...)$mse, n=1)
+      rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, mtry=i/3, ...)$prediction.error
     }
     
     out <- c(mean(rf), sd(rf))
@@ -206,11 +210,11 @@ VSURF_interp.default <- function(
     
     if (clusterType=="FORK") {
       if (type=="classif") {
-        res <- parallel::mclapply(X=1:nvars, FUN=rf.interp.classif, ..., mc.cores=ncores,
+        res <- parallel::mclapply(X=1:nvars, FUN=rf.interp.classif, ..., num.threads=ncores,
                                   mc.preschedule=FALSE)
       }
       if (type=="reg") {
-        res <- parallel::mclapply(X=1:nvars, FUN=rf.interp.reg, ..., mc.cores=ncores,
+        res <- parallel::mclapply(X=1:nvars, FUN=rf.interp.reg, ..., num.threads=ncores,
                                   mc.preschedule=FALSE)
       }
     }
@@ -221,12 +225,12 @@ VSURF_interp.default <- function(
       # i <- NULL #to avoid check NOTE...
       
       if (type=="classif") {
-        res <- foreach::foreach(i=1:nvars, .packages="randomForest") %dopar% {
+        res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
           out <- rf.interp.classif(i, ...)
         }
       }
       if (type=="reg") {
-        res <- foreach::foreach(i=1:nvars, .packages="randomForest") %dopar% {
+        res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
           out <- rf.interp.reg(i, ...)
         }
       }     

@@ -161,6 +161,8 @@ VSURF_thres.default <- function(
     type <- "reg"
   }
   
+  dat <- cbind(x, "y" = y)
+  
   # m: matrix with VI
   # perf: matrix with OOB errors
   m <- matrix(NA, nrow=nfor.thres, ncol=ncol(x))
@@ -168,28 +170,36 @@ VSURF_thres.default <- function(
   
   # if all forests have to be stored in memory, lines involving "rfmem" must be uncommented
   #rfmem=list()
-  
+
   # filling of matrix m by running nfor.thres forests and keeping VI
   # filling of perf with the nfor.thres forests OOB errors
   
   rf.classif <- function(i, ...) {
-    rf <- randomForest::randomForest(x=x, y=y, ntree=ntree, mtry=mtry, importance=TRUE, ...)
-    m <- rf$importance[, length(levels(y))+1]
-    perf <- tail(rf$err.rate[,1], n=1)
+    rf <- ranger::ranger(dependent.variable.name = "y", data=dat, num.trees=ntree, 
+                         mtry=mtry, importance="permutation",
+                         # write.forest=TRUE,
+                         # keep.inbag=TRUE,
+                         ...)
+    m <- rf$variable.importance
+    perf <- rf$prediction.error
     out <- list(m=m, perf=perf)
   }
   
   rf.reg <- function(i, ...) {
-    rf <- randomForest::randomForest(x=x, y=y, ntree=ntree, mtry=mtry, importance=TRUE, ...)
-    m <- rf$importance[, 1]
-    perf <- tail(rf$mse, n=1)
+    rf <- ranger::ranger(dependent.variable.name = "y", data=dat, num.trees=ntree, 
+                         mtry=mtry, importance="permutation",
+                         # write.forest=TRUE,
+                         # keep.inbag=TRUE,
+                         ...)
+    m <- rf$variable.importance
+    perf <- rf$prediction.error
     out <- list(m=m, perf=perf)
   }
   
   if (!parallel) {
     if (type=="classif") {
       for (i in 1:nfor.thres){
-        rf <- rf.classif(i, ...)
+        rf <- rf.classif(i)#, ...)
         m[i,] <- rf$m
         perf[i] <- rf$perf
       }
@@ -206,10 +216,10 @@ VSURF_thres.default <- function(
   else {
     if (clusterType=="FORK") {
       if (type=="classif") {
-        res <- parallel::mclapply(X=1:nfor.thres, FUN=rf.classif, ..., mc.cores=ncores)
+        res <- parallel::mclapply(X=1:nfor.thres, FUN=rf.classif, ..., num.threads=ncores)
       }
       if (type=="reg") {
-        res <- parallel::mclapply(X=1:nfor.thres, FUN=rf.reg, ..., mc.cores=ncores)
+        res <- parallel::mclapply(X=1:nfor.thres, FUN=rf.reg, ..., num.threads=ncores)
       }
     }
     
@@ -218,13 +228,13 @@ VSURF_thres.default <- function(
       doParallel::registerDoParallel(clust)
       
       if (type=="classif") {
-        res <- foreach::foreach(i=1:nfor.thres, .packages="randomForest") %dopar% {
+        res <- foreach::foreach(i=1:nfor.thres, .packages="ranger") %dopar% {
           out <- rf.classif(i, ...)
         }
       }
       
       if (type=="reg") {
-        res <- foreach::foreach(i=1:nfor.thres, .packages="randomForest") %dopar% {
+        res <- foreach::foreach(i=1:nfor.thres, .packages="ranger") %dopar% {
           out <- rf.reg(i, ...)
         }
       }
@@ -240,7 +250,7 @@ VSURF_thres.default <- function(
   m_na.omit <- stats::na.omit(m)
   if (nrow(m_na.omit) != nrow(m)) {
       warning(
-          paste0(nrow(m) - nrow(m_na.omit), " runs of randomForest were removed
+          paste0(nrow(m) - nrow(m_na.omit), " runs of ranger were removed
                 (among ", nfor.thres, ") because they contained no OOB
                 observations for some trees")
       )

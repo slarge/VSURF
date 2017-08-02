@@ -126,7 +126,7 @@ VSURF_pred.default <-function(x, y, ntree = 2000, err.interp, varselect.interp,
   else {
     type <- "reg"
   }
-  
+
   k <- length(err.interp)
   l <- length(varselect.interp)
   
@@ -153,17 +153,19 @@ did not eliminate variables")
     varselect.pred <- varselect.interp[1]
     u <- varselect.pred
     w <- x[,u, drop=FALSE]
+    
+    dat <- cbind(w, "y" = y)
+    
     rf <- rep(NA, nfor.pred)
     if (type=="classif") {
       for (j in 1:nfor.pred) {
-        rf[j] <- tail(randomForest::randomForest(x=w, y=y, ...)$err.rate[,1], n=1)
+        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, ...)$prediction.error
       }
-      
       err.pred <- mean(rf)
     }
     if (type=="reg") {
       for (j in 1:nfor.pred) {
-        rf[j] <- tail(randomForest::randomForest(x=w, y=y, ...)$mse, n=1)
+        rf[j] <- ranger::ranger(dependent.variable.name="y",  data=dat, num.trees=ntree, ...)$prediction.error
       }
       err.pred <- mean(rf)
     }
@@ -173,24 +175,27 @@ did not eliminate variables")
       for (i in 2:l){
         u <- c(varselect.pred, varselect.interp[i])
         w <- x[,u, drop=FALSE]
+        
+        dat <- cbind(w, "y" = y)
+        
         rf <- rep(NA, nfor.pred)
         if (type=="classif") {
           if (i <= n) {
             for (j in 1:nfor.pred) {
-              rf[j] <- tail(randomForest::randomForest(x=w, y=y, ...)$err.rate[,1], n=1)
+              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, ...)$prediction.error
             }
           }
           
           else {
             for (j in 1:nfor.pred) {
-              rf[j] <- tail(randomForest::randomForest(x=w, y=y, mtry=i/3, ...)$err.rate[,1], n=1)
+              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, mtry=i/3, num.trees=ntree, ...)$prediction.error
             }
           }
           z <- mean(rf)
         }
         if (type=="reg") {
           for (j in 1:nfor.pred) {
-            rf[j] <- tail(randomForest::randomForest(x=w, y=y, ...)$mse, n=1)
+            rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, ...)$prediction.error
           }
           z <- mean(rf)
         }
