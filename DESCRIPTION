@@ -24,7 +24,8 @@ Imports:
     foreach,
     parallel,
     randomForest,
-    rpart
+    rpart,
+    ranger
 Suggests:
     testthat
 RoxygenNote: 5.0.1
