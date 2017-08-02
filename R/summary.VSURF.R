@@ -56,6 +56,6 @@ summary.VSURF <- function(object, ...) {
 
   if (!is.null(object$ncores)) {
     cat(paste("\n VSURF ran in parallel on a", object$clusterType,
-              "cluster and used", object$ncores, "cores", "\n", sep=" "))
+              "cluster and used", object$ncores, "cores.", "\n", sep=" "))
   }
 }
