@@ -256,7 +256,7 @@ VSURF_pred.formula <- function(formula, data, ..., na.action = na.fail) {
     for (i in seq(along=ncol(m))) {
         if (is.ordered(m[[i]])) m[[i]] <- as.numeric(m[[i]])
     }
-    ret <- VSURF_pred(m, y, ...)
+    ret <- VSURF_pred(m, as.numeric(y), ...)
     cl <- match.call()
     cl[[1]] <- as.name("VSURF_pred")
     ret$call <- cl

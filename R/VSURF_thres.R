@@ -365,7 +365,7 @@ VSURF_thres.formula <- function(formula, data, ..., na.action = na.fail) {
   for (i in seq(along=ncol(m))) {
     if (is.ordered(m[[i]])) m[[i]] <- as.numeric(m[[i]])
   }
-  ret <- VSURF_thres.default(x=m, y=y, ...)
+    ret <- VSURF_thres.default(x=m, y=as.numeric(y), ...)
   cl <- match.call()
   cl[[1]] <- as.name("VSURF")
   ret$call <- cl
