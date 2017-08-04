@@ -162,13 +162,13 @@ did not eliminate variables")
     rf <- rep(NA, nfor.pred)
     if (type=="classif") {
       for (j in 1:nfor.pred) {
-        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
+        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = NULL, ...)$prediction.error
       }
       err.pred <- mean(rf)
     }
     if (type=="reg") {
       for (j in 1:nfor.pred) {
-        rf[j] <- ranger::ranger(dependent.variable.name="y",  data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
+        rf[j] <- ranger::ranger(dependent.variable.name="y",  data=dat, num.trees=ntree, num.threads = NULL, ...)$prediction.error
       }
       err.pred <- mean(rf)
     }
@@ -185,20 +185,20 @@ did not eliminate variables")
         if (type=="classif") {
           if (i <= n) {
             for (j in 1:nfor.pred) {
-              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
+              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = NULL, ...)$prediction.error
             }
           }
           
           else {
             for (j in 1:nfor.pred) {
-              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, mtry=i/3, num.trees=ntree, num.threads = ncores, ...)$prediction.error
+              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, mtry=i/3, num.trees=ntree, num.threads = NULL, ...)$prediction.error
             }
           }
           z <- mean(rf)
         }
         if (type=="reg") {
           for (j in 1:nfor.pred) {
-            rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
+            rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = NULL, ...)$prediction.error
           }
           z <- mean(rf)
         }
