@@ -1,6 +1,8 @@
 
 # VSURF
 
+_NOTE: this is a test implementation of VSURF using the [ranger](https://github.com/imbs-hl/ranger) package for RF._
+
 [![Travis-CI Build Status](https://travis-ci.org/robingenuer/VSURF.png?branch=master)](https://travis-ci.org/robingenuer/VSURF)
 
 Variable Selection Using Random Forests
@@ -28,7 +30,7 @@ To try the current development version from github, use :
 
 
 ```r
-devtools::install_github("robingenuer/VSURF")
+devtools::install_github("slarge/VSURF")
 # This needs the devtools package to be installed :
 # install.packages("devtools")
 ```
