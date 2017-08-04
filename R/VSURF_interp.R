@@ -105,7 +105,9 @@
 #' toys.interp}
 #'
 #' @importFrom ranger ranger
-#' @importFrom parallel detectCores
+#' @importFrom doParallel registerDoParallel
+#' @importFrom foreach foreach %dopar%
+#' @importFrom parallel makeCluster stopCluster mclapply detectCores
 #' @export
 VSURF_interp <- function (x, ...) {
   UseMethod("VSURF_interp")
@@ -158,13 +160,15 @@ VSURF_interp.default <- function(
     
     if (i <= n) {
       for (j in 1:nfor.interp) {
-        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
+        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree,
+                                num.threads = NULL, ...)$prediction.error
       }
     }
     
     else {
       for (j in 1:nfor.interp) {
-        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, mtry=i/3, num.threads = ncores, ...)$prediction.error
+        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, mtry=i/3, 
+                                num.threads = NULL, ...)$prediction.error
       }
     }
     
@@ -179,29 +183,30 @@ VSURF_interp.default <- function(
     dat <- cbind(w, "y" = y)
     
     for (j in 1:nfor.interp) {
-      rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, mtry=i/3, num.threads = ncores, ...)$prediction.error
+      rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree,
+                              mtry=i/3, num.threads = NULL, ...)$prediction.error
     }
     
     out <- c(mean(rf), sd(rf))
   }
   
-  # ncores <- min(nvars, ncores)
+  ncores <- min(nvars, ncores)
   
-  # if (!parallel) {
-  if (type=="classif") {
-    for (i in 1:nvars){
-      res <- rf.interp.classif(i, ...)
-      err.interp[i] <- res[1]
-      sd.interp[i] <- res[2]
-    }
-  }
-  if (type=="reg") {
-    for (i in 1:nvars){
-      res <- rf.interp.reg(i, ...)
-      err.interp[i] <- res[1]
-      sd.interp[i] <- res[2]
-    }
-  }
+  # # if (!parallel) {
+  # if (type=="classif") {
+  #   for (i in 1:nvars){
+  #     res <- rf.interp.classif(i, ...)
+  #     err.interp[i] <- res[1]
+  #     sd.interp[i] <- res[2]
+  #   }
+  # }
+  # if (type=="reg") {
+  #   for (i in 1:nvars){
+  #     res <- rf.interp.reg(i, ...)
+  #     err.interp[i] <- res[1]
+  #     sd.interp[i] <- res[2]
+  #   }
+  # }
   # }  
   # 
   # else {    
@@ -219,27 +224,27 @@ VSURF_interp.default <- function(
   #   }
   #   
   #   else { 
-  #     clust <- parallel::makeCluster(spec=ncores, type=clusterType)
-  #     doParallel::registerDoParallel(clust)
+      clust <- parallel::makeCluster(spec=ncores, type= "PSOCK")
+      doParallel::registerDoParallel(clust)
   #     # i <- NULL #to avoid check NOTE...
   #     
-  #     if (type=="classif") {
-  #       res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
-  #         out <- rf.interp.classif(i, ...)
-  #       }
-  #     }
-  #     if (type=="reg") {
-  #       res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
-  #         out <- rf.interp.reg(i, ...)
-  #       }
-  #     }     
-  #     parallel::stopCluster(clust)
+      if (type=="classif") {
+        res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
+          out <- rf.interp.classif(i, ...)
+        }
+      }
+      if (type=="reg") {
+        res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
+          out <- rf.interp.reg(i, ...)
+        }
+      }
+      parallel::stopCluster(clust)
     # }
     
-  # for (i in 1:nvars) {
-  #   err.interp[i] <- res[[i]][1]
-  #   sd.interp[i] <- res[[i]][2]
-  # }
+  for (i in 1:nvars) {
+    err.interp[i] <- res[[i]][1]
+    sd.interp[i] <- res[[i]][2]
+  }
   # }
   
   var.min <- which.min(err.interp)
