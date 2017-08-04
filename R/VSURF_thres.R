@@ -111,12 +111,9 @@
 #' toys.thres <- VSURF_thres(toys$x, toys$y)
 #' toys.thres}
 #'
-#' @importFrom randomForest randomForest
+#' @importFrom ranger ranger
 #' @importFrom rpart rpart prune
-#' @importFrom doParallel registerDoParallel
-#' @importFrom foreach foreach %dopar%
-#' @importFrom parallel makeCluster stopCluster mclapply detectCores
-#' @importFrom utils tail
+#' @importFrom parallel detectCores
 #' @importFrom stats model.frame model.response na.fail predict reformulate
 #' @importFrom stats sd terms na.omit
 #' @export
@@ -127,8 +124,7 @@ VSURF_thres <- function (x, ...) {
 #' @rdname VSURF_thres
 #' @export
 VSURF_thres.default <- function(
-  x, y, ntree = 2000, mtry = max(floor(ncol(x) / 3), 1), nfor.thres = 50, nmin = 1,
-  parallel = FALSE, clusterType = "PSOCK", ncores = detectCores() - 1, ...) {
+  x, y, ntree = 2000, mtry = max(floor(ncol(x) / 3), 1), nfor.thres = 50, nmin = 1, ncores = detectCores() - 1, ...) {
   
   # x: input
   # y: output
@@ -138,10 +134,10 @@ VSURF_thres.default <- function(
   
   start <- Sys.time()
   
-  if (!parallel) {
-    clusterType <- NULL
-    ncores <- NULL
-  }
+  # if (!parallel) {
+  #   clusterType <- NULL
+  #   ncores <- NULL
+  # }
   
   ncores <- min(nfor.thres, ncores)
   
@@ -176,10 +172,7 @@ VSURF_thres.default <- function(
   
   rf.classif <- function(i, ...) {
     rf <- ranger::ranger(dependent.variable.name = "y", data=dat, num.trees=ntree, 
-                         mtry=mtry, importance="permutation",
-                         # write.forest=TRUE,
-                         # keep.inbag=TRUE,
-                         ...)
+                         mtry=mtry, importance="permutation", num.threads = ncores, ...)
     m <- rf$variable.importance
     perf <- rf$prediction.error
     out <- list(m=m, perf=perf)
@@ -187,65 +180,62 @@ VSURF_thres.default <- function(
   
   rf.reg <- function(i, ...) {
     rf <- ranger::ranger(dependent.variable.name = "y", data=dat, num.trees=ntree, 
-                         mtry=mtry, importance="permutation",
-                         # write.forest=TRUE,
-                         # keep.inbag=TRUE,
-                         ...)
+                         mtry=mtry, importance="permutation", num.threads = ncores, ...)
     m <- rf$variable.importance
     perf <- rf$prediction.error
     out <- list(m=m, perf=perf)
   }
   
-  if (!parallel) {
-    if (type=="classif") {
-      for (i in 1:nfor.thres){
-        rf <- rf.classif(i)#, ...)
-        m[i,] <- rf$m
-        perf[i] <- rf$perf
-      }
-    }
-    if (type=="reg") {
-      for (i in 1:nfor.thres){
-        rf <- rf.reg(i, ...)
-        m[i,] <- rf$m
-        perf[i] <- rf$perf
-      }
+  # if (!parallel) {
+  if (type=="classif") {
+    for (i in 1:nfor.thres){
+      rf <- rf.classif(i, ...)
+      m[i,] <- rf$m
+      perf[i] <- rf$perf
     }
   }
-  
-  else {
-    if (clusterType=="FORK") {
-      if (type=="classif") {
-        res <- parallel::mclapply(X=1:nfor.thres, FUN=rf.classif, ..., num.threads=ncores)
-      }
-      if (type=="reg") {
-        res <- parallel::mclapply(X=1:nfor.thres, FUN=rf.reg, ..., num.threads=ncores)
-      }
-    }
-    
-    else {
-      clust <- parallel::makeCluster(spec=ncores, type=clusterType)
-      doParallel::registerDoParallel(clust)
-      
-      if (type=="classif") {
-        res <- foreach::foreach(i=1:nfor.thres, .packages="ranger") %dopar% {
-          out <- rf.classif(i, ...)
-        }
-      }
-      
-      if (type=="reg") {
-        res <- foreach::foreach(i=1:nfor.thres, .packages="ranger") %dopar% {
-          out <- rf.reg(i, ...)
-        }
-      }
-      parallel::stopCluster(clust)
-    }
-    
-    for (i in 1:nfor.thres) {
-      m[i,] <- res[[i]]$m
-      perf[i] <- res[[i]]$perf
+  if (type=="reg") {
+    for (i in 1:nfor.thres){
+      rf <- rf.reg(i, ...)
+      m[i,] <- rf$m
+      perf[i] <- rf$perf
     }
   }
+  # }
+  # 
+  # else {
+  #   if (clusterType=="FORK") {
+  #     if (type=="classif") {
+  #       res <- parallel::mclapply(X=1:nfor.thres, FUN=rf.classif, ..., num.threads=ncores)
+  #     }
+  #     if (type=="reg") {
+  #       res <- parallel::mclapply(X=1:nfor.thres, FUN=rf.reg, ..., num.threads=ncores)
+  #     }
+  #   }
+  #   
+  #   else {
+  #     clust <- parallel::makeCluster(spec=ncores, type=clusterType)
+  #     doParallel::registerDoParallel(clust)
+  #     
+  #     if (type=="classif") {
+  #       res <- foreach::foreach(i=1:nfor.thres, .packages="ranger") %dopar% {
+  #         out <- rf.classif(i, ...)
+  #       }
+  #     }
+  #     
+  #     if (type=="reg") {
+  #       res <- foreach::foreach(i=1:nfor.thres, .packages="ranger") %dopar% {
+  #         out <- rf.reg(i, ...)
+  #       }
+  #     }
+  #     parallel::stopCluster(clust)
+  #   }
+  #   
+  # for (i in 1:nfor.thres) {
+  #   m[i,] <- res[[i]]$m
+  #   perf[i] <- res[[i]]$perf
+  # }
+  # }
   
   m_na.omit <- stats::na.omit(m)
   if (nrow(m_na.omit) != nrow(m)) {
@@ -326,7 +316,6 @@ VSURF_thres.default <- function(
                  'nmin' = nmin,
                  'comput.time'=comput.time,
                  'ncores'=ncores,
-                 'clusterType'=clusterType,
                  'call'=cl)
   class(output) <- c("VSURF_thres")
   output
@@ -365,7 +354,7 @@ VSURF_thres.formula <- function(formula, data, ..., na.action = na.fail) {
   for (i in seq(along=ncol(m))) {
     if (is.ordered(m[[i]])) m[[i]] <- as.numeric(m[[i]])
   }
-    ret <- VSURF_thres.default(x=m, y=as.numeric(y), ...)
+    ret <- VSURF_thres.default(x=m, y=as.vector(y), ...)
   cl <- match.call()
   cl[[1]] <- as.name("VSURF")
   ret$call <- cl

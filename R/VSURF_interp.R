@@ -104,10 +104,8 @@
 #' toys.interp <- VSURF_interp(toys$x, toys$y, vars = toys.thres$varselect.thres)
 #' toys.interp}
 #'
-#' @importFrom randomForest randomForest
-#' @importFrom doParallel registerDoParallel
-#' @importFrom foreach foreach %dopar%
-#' @importFrom parallel makeCluster stopCluster mclapply detectCores
+#' @importFrom ranger ranger
+#' @importFrom parallel detectCores
 #' @export
 VSURF_interp <- function (x, ...) {
   UseMethod("VSURF_interp")
@@ -116,8 +114,7 @@ VSURF_interp <- function (x, ...) {
 #' @rdname VSURF_interp
 #' @export
 VSURF_interp.default <- function(
-  x, y, ntree = 2000, vars, nfor.interp = 25, nsd = 1, parallel = FALSE,
-  ncores = detectCores()-1, clusterType = "PSOCK",  ...) {
+  x, y, ntree = 2000, vars, nfor.interp = 25, nsd = 1, ncores = detectCores()-1,  ...) {
   
   # vars: selected variables indices after thresholding step
   # nfor.interp: number of forests to estimate each model
@@ -126,10 +123,10 @@ VSURF_interp.default <- function(
   
   start <- Sys.time()
   
-  if (!parallel) {
-    clusterType <- NULL
-    ncores <- NULL
-  }  
+  # if (!parallel) {
+  #   clusterType <- NULL
+  #   ncores <- NULL
+  # }  
   
   # determinination the problem type: classification or regression
   # (code gratefully stolen from randomForest.default function of randomForest package)
@@ -161,13 +158,13 @@ VSURF_interp.default <- function(
     
     if (i <= n) {
       for (j in 1:nfor.interp) {
-        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, ...)$prediction.error
+        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
       }
     }
     
     else {
       for (j in 1:nfor.interp) {
-        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, mtry=i/3, ...)$prediction.error
+        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, mtry=i/3, num.threads = ncores, ...)$prediction.error
       }
     }
     
@@ -182,66 +179,68 @@ VSURF_interp.default <- function(
     dat <- cbind(w, "y" = y)
     
     for (j in 1:nfor.interp) {
-      rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, mtry=i/3, ...)$prediction.error
+      rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, mtry=i/3, num.threads = ncores, ...)$prediction.error
     }
     
     out <- c(mean(rf), sd(rf))
   }
   
-  if (!parallel) {
-    if (type=="classif") {
-      for (i in 1:nvars){
-        res <- rf.interp.classif(i, ...)
-        err.interp[i] <- res[1]
-        sd.interp[i] <- res[2]
-      }
-    }
-    if (type=="reg") {
-      for (i in 1:nvars){
-        res <- rf.interp.reg(i, ...)
-        err.interp[i] <- res[1]
-        sd.interp[i] <- res[2]
-      }
-    }
-  }  
+  # ncores <- min(nvars, ncores)
   
-  else {    
-    ncores <- min(nvars, ncores)
-    
-    if (clusterType=="FORK") {
-      if (type=="classif") {
-        res <- parallel::mclapply(X=1:nvars, FUN=rf.interp.classif, ..., num.threads=ncores,
-                                  mc.preschedule=FALSE)
-      }
-      if (type=="reg") {
-        res <- parallel::mclapply(X=1:nvars, FUN=rf.interp.reg, ..., num.threads=ncores,
-                                  mc.preschedule=FALSE)
-      }
-    }
-    
-    else { 
-      clust <- parallel::makeCluster(spec=ncores, type=clusterType)
-      doParallel::registerDoParallel(clust)
-      # i <- NULL #to avoid check NOTE...
-      
-      if (type=="classif") {
-        res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
-          out <- rf.interp.classif(i, ...)
-        }
-      }
-      if (type=="reg") {
-        res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
-          out <- rf.interp.reg(i, ...)
-        }
-      }     
-      parallel::stopCluster(clust)
-    }
-    
-    for (i in 1:nvars) {
-      err.interp[i] <- res[[i]][1]
-      sd.interp[i] <- res[[i]][2]
+  # if (!parallel) {
+  if (type=="classif") {
+    for (i in 1:nvars){
+      res <- rf.interp.classif(i, ...)
+      err.interp[i] <- res[1]
+      sd.interp[i] <- res[2]
     }
   }
+  if (type=="reg") {
+    for (i in 1:nvars){
+      res <- rf.interp.reg(i, ...)
+      err.interp[i] <- res[1]
+      sd.interp[i] <- res[2]
+    }
+  }
+  # }  
+  # 
+  # else {    
+  #   ncores <- min(nvars, ncores)
+  #   
+  #   if (clusterType=="FORK") {
+  #     if (type=="classif") {
+  #       res <- parallel::mclapply(X=1:nvars, FUN=rf.interp.classif, ..., num.threads=ncores,
+  #                                 mc.preschedule=FALSE)
+  #     }
+  #     if (type=="reg") {
+  #       res <- parallel::mclapply(X=1:nvars, FUN=rf.interp.reg, ..., num.threads=ncores,
+  #                                 mc.preschedule=FALSE)
+  #     }
+  #   }
+  #   
+  #   else { 
+  #     clust <- parallel::makeCluster(spec=ncores, type=clusterType)
+  #     doParallel::registerDoParallel(clust)
+  #     # i <- NULL #to avoid check NOTE...
+  #     
+  #     if (type=="classif") {
+  #       res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
+  #         out <- rf.interp.classif(i, ...)
+  #       }
+  #     }
+  #     if (type=="reg") {
+  #       res <- foreach::foreach(i=1:nvars, .packages="ranger") %dopar% {
+  #         out <- rf.interp.reg(i, ...)
+  #       }
+  #     }     
+  #     parallel::stopCluster(clust)
+    # }
+    
+  # for (i in 1:nvars) {
+  #   err.interp[i] <- res[[i]][1]
+  #   sd.interp[i] <- res[[i]][2]
+  # }
+  # }
   
   var.min <- which.min(err.interp)
   sd.min <- sd.interp[var.min]
@@ -262,7 +261,6 @@ VSURF_interp.default <- function(
                  'nsd' = nsd,
                  'comput.time'=comput.time,
                  'ncores'=ncores,
-                 'clusterType'=clusterType,
                  'call'=cl)
   class(output) <- c("VSURF_interp")
   output
@@ -300,7 +298,7 @@ VSURF_interp.formula <- function(formula, data, ..., na.action = na.fail) {
   for (i in seq(along=ncol(m))) {
     if (is.ordered(m[[i]])) m[[i]] <- as.numeric(m[[i]])
   }
-  ret <- VSURF_interp.default(x=m, y=as.numeric(y), ...)
+  ret <- VSURF_interp.default(x=m, y=as.vector(y), ...)
   cl <- match.call()
   cl[[1]] <- as.name("VSURF")
   ret$call <- cl

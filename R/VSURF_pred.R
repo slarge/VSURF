@@ -38,6 +38,8 @@
 #' interpretation step.
 #' @param nfor.pred Number of forests grown.
 #' @param nmj Number of times the mean jump is multiplied. See details below.
+#' @param ncores Number of cores to use. Default is set to the number of cores
+#' detected by R minus 1.
 #' @param ...  others parameters to be passed on to the \code{\link{VSURF}}
 #' function.
 #' 
@@ -93,7 +95,8 @@
 #'                         varselect.interp = toys.interp$varselect.interp)
 #' toys.pred}
 #'
-#' @importFrom randomForest randomForest
+#' @importFrom ranger ranger
+#' @importFrom parallel detectCores
 #' @export
 VSURF_pred <- function (x, ...) {
   UseMethod("VSURF_pred")
@@ -102,7 +105,7 @@ VSURF_pred <- function (x, ...) {
 #' @rdname VSURF_pred
 #' @export
 VSURF_pred.default <-function(x, y, ntree = 2000, err.interp, varselect.interp,
-                              nfor.pred = 25, nmj = 1, ...){
+                              nfor.pred = 25, nmj = 1, ncores = detectCores()-1, ...){
   
   # err.interp: interpretation models errors
   # varselect.interp: interpretation variables indices
@@ -159,13 +162,13 @@ did not eliminate variables")
     rf <- rep(NA, nfor.pred)
     if (type=="classif") {
       for (j in 1:nfor.pred) {
-        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, ...)$prediction.error
+        rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
       }
       err.pred <- mean(rf)
     }
     if (type=="reg") {
       for (j in 1:nfor.pred) {
-        rf[j] <- ranger::ranger(dependent.variable.name="y",  data=dat, num.trees=ntree, ...)$prediction.error
+        rf[j] <- ranger::ranger(dependent.variable.name="y",  data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
       }
       err.pred <- mean(rf)
     }
@@ -182,20 +185,20 @@ did not eliminate variables")
         if (type=="classif") {
           if (i <= n) {
             for (j in 1:nfor.pred) {
-              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, ...)$prediction.error
+              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
             }
           }
           
           else {
             for (j in 1:nfor.pred) {
-              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, mtry=i/3, num.trees=ntree, ...)$prediction.error
+              rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, mtry=i/3, num.trees=ntree, num.threads = ncores, ...)$prediction.error
             }
           }
           z <- mean(rf)
         }
         if (type=="reg") {
           for (j in 1:nfor.pred) {
-            rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, ...)$prediction.error
+            rf[j] <- ranger::ranger(dependent.variable.name="y", data=dat, num.trees=ntree, num.threads = ncores, ...)$prediction.error
           }
           z <- mean(rf)
         }
@@ -256,7 +259,7 @@ VSURF_pred.formula <- function(formula, data, ..., na.action = na.fail) {
     for (i in seq(along=ncol(m))) {
         if (is.ordered(m[[i]])) m[[i]] <- as.numeric(m[[i]])
     }
-    ret <- VSURF_pred(m, as.numeric(y), ...)
+    ret <- VSURF_pred(m, as.vector(y), ...)
     cl <- match.call()
     cl[[1]] <- as.name("VSURF_pred")
     ret$call <- cl

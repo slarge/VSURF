@@ -200,26 +200,26 @@ VSURF <- function (x, ...) {
 VSURF.default <- function(
   x, y, ntree = 2000, mtry = max(floor(ncol(x)/3), 1),
   nfor.thres = 50, nmin = 1, nfor.interp = 25, nsd = 1, nfor.pred = 25, nmj = 1,
-  parallel = FALSE, ncores = detectCores() - 1, clusterType = "PSOCK", ...) {
+  ncores = detectCores() - 1, ...) {
 
   start <- Sys.time()
-  
-  if (!parallel) {
-    clusterType <- NULL
-    ncores <- NULL
-  }
-  
+  # 
+  # if (!parallel) {
+  #   clusterType <- NULL
+  #   ncores <- NULL
+  # }
+  # 
   thres <- VSURF_thres(
     x=x, y=y, ntree=ntree, mtry=mtry, nfor.thres=nfor.thres, nmin=nmin,
-    parallel=parallel, clusterType=clusterType, ncores=ncores, ...)
+    ncores=ncores, ...)
   
   interp <- VSURF_interp(
     x=x, y=y, ntree=ntree, vars=thres$varselect.thres, nfor.interp=nfor.interp, nsd=nsd,
-    parallel=parallel, clusterType=clusterType, ncores=ncores, ...)
+    ncores=ncores, ...)
   
   pred <- VSURF_pred(x=x, y=y, ntree=ntree, err.interp=interp$err.interp,
                      varselect.interp=interp$varselect.interp,
-                     nfor.pred=nfor.pred, nmj=nmj, ...)
+                     nfor.pred=nfor.pred, nmj=nmj, ncores=ncores, ...)
   
   cl <- match.call()
   cl[[1]] <- as.name("VSURF")
@@ -249,7 +249,6 @@ VSURF.default <- function(
                  'overall.time'=overall.time,
                  'comput.times'=list(thres$comput.time, interp$comput.time, pred$comput.time),
                  'ncores'=ncores,          
-                 'clusterType'=clusterType,
                  'call'=cl)
   class(output) <- c("VSURF")
   output
@@ -287,7 +286,7 @@ VSURF.formula <- function(formula, data, ..., na.action = na.fail) {
     for (i in seq(along=ncol(m))) {
         if (is.ordered(m[[i]])) m[[i]] <- as.numeric(m[[i]])
     }
-    ret <- VSURF.default(x=m, y=as.numeric(y), ...)
+    ret <- VSURF.default(x=m, y=as.vector(y), ...)
     cl <- match.call()
     cl[[1]] <- as.name("VSURF")
     ret$call <- cl
